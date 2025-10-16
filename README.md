@@ -17,7 +17,7 @@ MiTurno busca democratizar el acceso a la tecnología, ofreciendo una herramient
 Nuestra misión es democratizar el acceso a la tecnología para las pequeñas y medianas empresas (PYMES) del sector de la belleza y el cuidado personal en Colombia. A través de una plataforma de gestión intuitiva, asequible y adaptada a sus necesidades reales, simplificamos sus operaciones diarias, les permitimos profesionalizar su servicio y potenciamos su crecimiento sostenible en la economía digital.
 
 ### Visión
-Ser la plataforma de software líder y el aliado estratégico preferido para la gestión y crecimiento de los negocios de belleza y bienestar en Colombia para el año 2028, reconocidos por nuestra innovación práctica, nuestra facilidad de uso y un profundo compromiso con el éxito y la formalización de nuestros clientes.
+Ser la plataforma de software líder y el aliado estratégico preferido para la gestión y crecimiento de los negocios de belleza y bienestar en Colombia para el año 2030, reconocidos por nuestra innovación práctica, nuestra facilidad de uso y un profundo compromiso con el éxito y la formalización de nuestros clientes.
 
 ---
 
@@ -73,10 +73,8 @@ Nuestra solución está dirigida a **micro y pequeños empresarios del sector de
 ---
 
 ## 🧑‍💻 Autores del Proyecto
-Esteban Guevara Cardona (EstebanGC222)
 
-*   **Daniel Santiago Lopez Quiceno**
 *   **Esteban Guevara Cardona**
-*   **Samuel Acevedo Gomez**
+
 
 Un proyecto de la **Universidad Tecnológica de Pereira**, para la carrera de **Tecnología en Desarrollo de Software**.
