@@ -1,10 +1,3 @@
-// src/app/admin/dashboard/page.tsx
-
-/**
- * Dashboard admin con estadísticas
- * Ruta: /admin/dashboard
- */
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -20,7 +13,6 @@ interface EstadisticasDto {
   totalCitas: number
   citasConfirmadas: number
   citasCanceladas: number
-  citasCompletadas: number
   ingresoTotal: number
   ingresoEstasMes: number
   servicioMasPopular: string | null
@@ -41,36 +33,29 @@ export default function PaginaDashboard() {
   const verificarAutenticacion = async () => {
     try {
       const supabase = crearCliente()
-
       const { data: { user } } = await supabase.auth.getUser()
-
       if (!user) {
         router.push('/auth/login')
         return
       }
-
       const { data: perfil, error: errorPerfil } = await supabase
         .from('usuarios')
         .select('*')
         .eq('id', user.id)
         .single()
-
       if (errorPerfil || !perfil) {
         setError('No se encontró tu perfil')
         setEstaCargando(false)
         return
       }
-
       if (perfil.rol !== 'admin') {
         setError('Solo los administradores pueden acceder al dashboard')
         setEstaCargando(false)
         return
       }
-
       setPropietario(perfil)
       await cargarEstadisticas(perfil.negocio_id)
     } catch (err) {
-      console.error('Error en verificarAutenticacion:', err)
       setError('Error al verificar autenticación')
       setEstaCargando(false)
     }
@@ -82,124 +67,106 @@ export default function PaginaDashboard() {
       const supabase = crearCliente()
 
       // Total de citas
-      const { data: totalCitasData } = await supabase
+      const { count: totalCitas = 0 } = await supabase
         .from('citas')
         .select('*', { count: 'exact', head: true })
         .eq('negocio_id', negocioId)
 
-      const totalCitas = totalCitasData?.length || 0
-
-      // Citas por estado
-      const { data: citasConfirmadas } = await supabase
+      // Citas confirmadas
+      const { count: citasConfirmadas = 0 } = await supabase
         .from('citas')
         .select('*', { count: 'exact', head: true })
         .eq('negocio_id', negocioId)
         .eq('estado', 'confirmada')
 
-      const { data: citasCanceladas } = await supabase
+      // Citas canceladas
+      const { count: citasCanceladas = 0 } = await supabase
         .from('citas')
         .select('*', { count: 'exact', head: true })
         .eq('negocio_id', negocioId)
         .eq('estado', 'cancelada')
 
-      const { data: citasCompletadas } = await supabase
+      // Ingreso total de citas confirmadas
+      const { data: citasConfirmadasDetalles } = await supabase
         .from('citas')
-        .select('*', { count: 'exact', head: true })
+        .select('*, servicio:servicios(precio)')
         .eq('negocio_id', negocioId)
-        .eq('estado', 'completada')
-
-      // Ingreso total (de citas completadas)
-      const { data: citasCompletadasDetalles } = await supabase
-        .from('citas')
-        .select(`
-          *,
-          servicio:servicios(precio)
-        `)
-        .eq('negocio_id', negocioId)
-        .eq('estado', 'completada')
-
-      const ingresoTotal = (citasCompletadasDetalles || []).reduce(
-        (suma, cita) => suma + (cita.servicio?.precio || 0),
-        0
+        .eq('estado', 'confirmada')
+      const ingresoTotal = (citasConfirmadasDetalles || []).reduce(
+        (suma, cita) => suma + (cita.servicio?.precio || 0), 0
       )
 
-      // Ingreso este mes
+      // Ingreso este mes (citas confirmadas)
       const ahora = new Date()
       const primerDiaMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString()
-
       const { data: citasEstasMes } = await supabase
         .from('citas')
-        .select(`
-          *,
-          servicio:servicios(precio)
-        `)
+        .select('*, servicio:servicios(precio)')
         .eq('negocio_id', negocioId)
-        .eq('estado', 'completada')
+        .eq('estado', 'confirmada')
         .gte('hora_inicio', primerDiaMes)
-
       const ingresoEstasMes = (citasEstasMes || []).reduce(
-        (suma, cita) => suma + (cita.servicio?.precio || 0),
-        0
+        (suma, cita) => suma + (cita.servicio?.precio || 0), 0
       )
 
-            // Servicio más popular
-      const { data: serviciosPopulares } = await supabase
-        .from('citas')
-        .select(`
-          servicio_id,
-          servicio:servicios(nombre)
-        `)
-        .eq('negocio_id', negocioId)
-        .eq('estado', 'completada')
+    // Servicio más popular (id)
+    const { data: serviciosPopulares } = await supabase
+      .from('citas')
+      .select('servicio_id')
+      .eq('negocio_id', negocioId)
+      .eq('estado', 'confirmada');
+    const conteoServicios: { [id: string]: number } = {};
+    (serviciosPopulares || []).forEach((cita: any) => {
+      const id = cita.servicio_id;
+      if (!conteoServicios[id]) conteoServicios[id] = 0;
+      conteoServicios[id]++;
+    });
+    const servicioMasPopularId = Object.entries(conteoServicios).sort((a, b) => b[1] - a[1])[0]?.[0];
 
-      const conteoServicios: { [key: string]: { nombre: string; count: number } } = {}
-      ;(serviciosPopulares || []).forEach((cita: any) => {
-        const nombre = cita.servicio?.[0]?.nombre || 'Desconocido'
-        if (!conteoServicios[nombre]) {
-          conteoServicios[nombre] = { nombre, count: 0 }
-        }
-        conteoServicios[nombre].count++
-      })
+    let servicioMasPopular = null;
+    if (servicioMasPopularId) {
+      const { data: servicioRow } = await supabase
+        .from('servicios')
+        .select('nombre')
+        .eq('id', servicioMasPopularId)
+        .single();
+      servicioMasPopular = servicioRow?.nombre || null;
+    }
 
-      const servicioMasPopular =
-        Object.values(conteoServicios).sort((a, b) => b.count - a.count)[0]?.nombre || null
+    // Empleado estrella (id)
+    const { data: empleadosEstrellas } = await supabase
+      .from('citas')
+      .select('empleado_id')
+      .eq('negocio_id', negocioId)
+      .eq('estado', 'confirmada');
+    const conteoEmpleados: { [id: string]: number } = {};
+    (empleadosEstrellas || []).forEach((cita: any) => {
+      const id = cita.empleado_id;
+      if (!conteoEmpleados[id]) conteoEmpleados[id] = 0;
+      conteoEmpleados[id]++;
+    });
+    const empleadoEstrellaId = Object.entries(conteoEmpleados).sort((a, b) => b[1] - a[1])[0]?.[0];
 
-      // Empleado estrella
-      const { data: empleadosEstrellas } = await supabase
-        .from('citas')
-        .select(`
-          empleado_id,
-          empleado:usuarios(nombre_completo)
-        `)
-        .eq('negocio_id', negocioId)
-        .eq('estado', 'completada')
-
-      const conteoEmpleados: { [key: string]: { nombre: string; count: number } } = {}
-      ;(empleadosEstrellas || []).forEach((cita: any) => {
-        const nombre = cita.empleado?.[0]?.nombre_completo || 'Desconocido'
-        if (!conteoEmpleados[nombre]) {
-          conteoEmpleados[nombre] = { nombre, count: 0 }
-        }
-        conteoEmpleados[nombre].count++
-      })
-
-      const empleadoEstrella =
-        Object.values(conteoEmpleados).sort((a, b) => b.count - a.count)[0]?.nombre || null
-
+    let empleadoEstrella = null;
+    if (empleadoEstrellaId) {
+      const { data: empleadoRow } = await supabase
+        .from('usuarios')
+        .select('nombre_completo')
+        .eq('id', empleadoEstrellaId)
+        .single();
+      empleadoEstrella = empleadoRow?.nombre_completo || null;
+    }
       setStats({
-        totalCitas,
-        citasConfirmadas: citasConfirmadas?.length || 0,
-        citasCanceladas: citasCanceladas?.length || 0,
-        citasCompletadas: citasCompletadas?.length || 0,
+        totalCitas: totalCitas || 0,
+        citasConfirmadas: citasConfirmadas || 0,
+        citasCanceladas: citasCanceladas || 0,
         ingresoTotal,
         ingresoEstasMes,
         servicioMasPopular,
         empleadoEstrella,
       })
-
       setEstaCargando(false)
     } catch (err) {
-      console.error('Error al cargar estadísticas:', err)
       setError('Error al cargar las estadísticas')
       setEstaCargando(false)
     }
@@ -254,16 +221,12 @@ export default function PaginaDashboard() {
               <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
                 ✓ {stats.citasConfirmadas}
               </span>
-              <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                ✓ {stats.citasCompletadas}
-              </span>
               <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
                 ✗ {stats.citasCanceladas}
               </span>
             </div>
           </CardContent>
         </Card>
-
         {/* Ingreso total */}
         <Card>
           <CardHeader className="pb-3">
@@ -276,11 +239,10 @@ export default function PaginaDashboard() {
               {formatearMoneda(stats.ingresoTotal)}
             </div>
             <p className="text-xs text-gray-600 mt-2">
-              De citas completadas
+              De citas confirmadas
             </p>
           </CardContent>
         </Card>
-
         {/* Ingreso este mes */}
         <Card>
           <CardHeader className="pb-3">
@@ -297,23 +259,22 @@ export default function PaginaDashboard() {
             </p>
           </CardContent>
         </Card>
-
         {/* Tasa de completación */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Tasa de Completación
+              Tasa de Confirmación
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-purple-600">
               {stats.totalCitas > 0
-                ? Math.round((stats.citasCompletadas / stats.totalCitas) * 100)
+                ? Math.round((stats.citasConfirmadas / stats.totalCitas) * 100)
                 : 0}
               %
             </div>
             <p className="text-xs text-gray-600 mt-2">
-              Citas completadas vs total
+              Citas confirmadas vs total
             </p>
           </CardContent>
         </Card>
@@ -336,7 +297,6 @@ export default function PaginaDashboard() {
             )}
           </CardContent>
         </Card>
-
         {/* Empleado estrella */}
         <Card>
           <CardHeader>
@@ -384,31 +344,6 @@ export default function PaginaDashboard() {
                 />
               </div>
             </div>
-
-            {/* Barra de citas completadas */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">
-                  Citas Completadas
-                </span>
-                <span className="text-sm text-gray-600">
-                  {stats.citasCompletadas}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full"
-                  style={{
-                    width: `${
-                      stats.totalCitas > 0
-                        ? (stats.citasCompletadas / stats.totalCitas) * 100
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-            </div>
-
             {/* Barra de citas canceladas */}
             <div>
               <div className="flex justify-between mb-2">

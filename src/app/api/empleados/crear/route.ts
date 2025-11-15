@@ -1,17 +1,12 @@
 // src/app/api/empleados/crear/route.ts
 
-/**
- * API Route para crear empleados
- * Usa la Service Role Key para acceso admin
- */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nombre, email, contrasena, telefono, negocio_id } = body
+    const { nombre, email, contrasena, telefono, negocio_id, foto_url } = body  // <-- incluimos foto_url
 
     // Validar campos requeridos
     if (!nombre || !email || !contrasena || !negocio_id) {
@@ -61,7 +56,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Crear perfil en tabla usuarios
+    // Crear perfil en tabla usuarios, incluyendo foto_url
     const { data: dataPerfil, error: errorPerfil } = await supabase
       .from('usuarios')
       .insert({
@@ -71,6 +66,8 @@ export async function POST(request: NextRequest) {
         nombre_completo: nombre,
         email,
         telefono: telefono || null,
+        foto_url: foto_url || null,           // <-- aquí guardamos la url que recibes
+        esta_activo: true
       })
       .select()
       .single()

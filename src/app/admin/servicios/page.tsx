@@ -8,7 +8,7 @@ import { Database } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type Servicio = Database['public']['Tables']['servicios']['Row']
 type Usuario = Database['public']['Tables']['usuarios']['Row']
@@ -20,12 +20,13 @@ export default function PaginaServicios() {
   const [estaCargando, setEstaCargando] = useState(true)
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [servicioEditando, setServicioEditando] = useState<Servicio | null>(null)
-  
+
   // Estado del formulario
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [precio, setPrecio] = useState('')
   const [duracion, setDuracion] = useState('')
+  const [imagenFile, setImagenFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Cargar datos al montar el componente
@@ -36,30 +37,24 @@ export default function PaginaServicios() {
   const verificarAutenticacion = async () => {
     try {
       const supabase = crearCliente()
-
       // Verificar si hay usuario logueado
       const { data: { user } } = await supabase.auth.getUser()
-
       if (!user) {
         router.push('/auth/login')
         return
       }
-
       // Cargar perfil del usuario
       const { data: perfil, error: errorPerfil } = await supabase
         .from('usuarios')
         .select('*')
         .eq('id', user.id)
         .single()
-
       if (errorPerfil || !perfil) {
         setError('No se encontró tu perfil')
         setEstaCargando(false)
         return
       }
-
       setUsuario(perfil)
-      
       // Ahora cargar servicios
       await cargarServicios(perfil.negocio_id)
     } catch (err) {
@@ -73,18 +68,15 @@ export default function PaginaServicios() {
     try {
       setEstaCargando(true)
       const supabase = crearCliente()
-
       const { data, error } = await supabase
         .from('servicios')
         .select('*')
         .eq('negocio_id', negocioId)
         .order('creado_en', { ascending: false })
-
       if (error) {
         console.error('Error en query:', error)
         throw error
       }
-
       setServicios(data || [])
     } catch (err) {
       console.error('Error al cargar servicios:', err)
@@ -101,6 +93,7 @@ export default function PaginaServicios() {
     setDuracion('')
     setServicioEditando(null)
     setError(null)
+    setImagenFile(null)
   }
 
   const manejarCrear = () => {
@@ -115,25 +108,35 @@ export default function PaginaServicios() {
     setPrecio(servicio.precio.toString())
     setDuracion(servicio.duracion_minutos.toString())
     setMostrarFormulario(true)
+    setImagenFile(null)
   }
 
   const manejarGuardar = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-
     if (!nombre || !precio || !duracion) {
       setError('Completa todos los campos requeridos')
       return
     }
-
     if (!usuario) {
       setError('Usuario no autenticado')
       return
     }
-
     try {
       const supabase = crearCliente()
-      
+      let imagenUrl: string | null = null
+
+      // Subir imagen si hay seleccionada
+      if (imagenFile) {
+        const { data, error: uploadError } = await supabase.storage
+          .from('servicios')
+          .upload(`fotos/${Date.now()}-${imagenFile.name}`, imagenFile)
+        if (uploadError) throw uploadError
+        imagenUrl = supabase.storage
+          .from('servicios')
+          .getPublicUrl(data.path).data.publicUrl
+      }
+
       if (servicioEditando) {
         // Actualizar servicio existente
         const { error } = await supabase
@@ -143,9 +146,9 @@ export default function PaginaServicios() {
             descripcion: descripcion || null,
             precio: parseFloat(precio),
             duracion_minutos: parseInt(duracion),
+            ...(imagenUrl && { imagen_url: imagenUrl }),
           })
           .eq('id', servicioEditando.id)
-
         if (error) throw error
       } else {
         // Crear nuevo servicio
@@ -157,8 +160,9 @@ export default function PaginaServicios() {
             descripcion: descripcion || null,
             precio: parseFloat(precio),
             duracion_minutos: parseInt(duracion),
+            imagen_url: imagenUrl,
+            esta_activo: true
           })
-
         if (error) throw error
       }
 
@@ -176,17 +180,13 @@ export default function PaginaServicios() {
     if (!confirm('¿Estás seguro de que quieres eliminar este servicio?')) {
       return
     }
-
     try {
       const supabase = crearCliente()
-
       const { error } = await supabase
         .from('servicios')
         .delete()
         .eq('id', id)
-
       if (error) throw error
-
       setServicios(servicios.filter(s => s.id !== id))
     } catch (err) {
       console.error('Error al eliminar:', err)
@@ -213,7 +213,6 @@ export default function PaginaServicios() {
         </div>
         <Button onClick={manejarCrear}>+ Nuevo Servicio</Button>
       </div>
-
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
           {error}
@@ -240,7 +239,6 @@ export default function PaginaServicios() {
                   required
                 />
               </div>
-
               <div>
                 <Label htmlFor="descripcion">Descripción</Label>
                 <Input
@@ -250,7 +248,6 @@ export default function PaginaServicios() {
                   placeholder="Detalles del servicio"
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="precio">Precio ($) *</Label>
@@ -265,7 +262,6 @@ export default function PaginaServicios() {
                     required
                   />
                 </div>
-
                 <div>
                   <Label htmlFor="duracion">Duración (minutos) *</Label>
                   <Input
@@ -279,7 +275,17 @@ export default function PaginaServicios() {
                   />
                 </div>
               </div>
-
+              <div>
+                <Label htmlFor="imagen">Imagen del servicio</Label>
+                <Input
+                  id="imagen"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) setImagenFile(e.target.files[0])
+                  }}
+                />
+              </div>
               <div className="flex gap-2">
                 <Button type="submit">
                   {servicioEditando ? 'Actualizar' : 'Crear'} Servicio
@@ -311,6 +317,9 @@ export default function PaginaServicios() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Imagen
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Nombre
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -330,6 +339,17 @@ export default function PaginaServicios() {
             <tbody className="divide-y divide-gray-200">
               {servicios.map((servicio) => (
                 <tr key={servicio.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm">
+                    {servicio.imagen_url ? (
+                      <img
+                        src={servicio.imagen_url}
+                        alt="Foto servicio"
+                        className="h-12 w-12 object-cover rounded"
+                      />
+                    ) : (
+                      <span className="text-gray-400">Sin foto</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">
                     {servicio.nombre}
                   </td>

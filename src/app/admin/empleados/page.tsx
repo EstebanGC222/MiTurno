@@ -1,8 +1,3 @@
-/**
- * Página para gestionar empleados (CRUD)
- * Ruta: /admin/empleados
- */
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -23,15 +18,15 @@ export default function PaginaEmpleados() {
   const [estaCargando, setEstaCargando] = useState(true)
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [empleadoEditando, setEmpleadoEditando] = useState<Usuario | null>(null)
-  
+
   // Estado del formulario
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [telefono, setTelefono] = useState('')
   const [contrasena, setContrasena] = useState('')
+  const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Cargar datos al montar el componente
   useEffect(() => {
     verificarAutenticacion()
   }, [])
@@ -39,35 +34,26 @@ export default function PaginaEmpleados() {
   const verificarAutenticacion = async () => {
     try {
       const supabase = crearCliente()
-
-      // Verificar si hay usuario logueado
       const { data: { user } } = await supabase.auth.getUser()
-
       if (!user) {
         router.push('/auth/login')
         return
       }
-
-      // Cargar perfil del usuario (propietario)
       const { data: perfil, error: errorPerfil } = await supabase
         .from('usuarios')
         .select('*')
         .eq('id', user.id)
         .single()
-
       if (errorPerfil || !perfil) {
         setError('No se encontró tu perfil')
         setEstaCargando(false)
         return
       }
-
-      // Verificar que sea admin
       if (perfil.rol !== 'admin') {
         setError('Solo los administradores pueden gestionar empleados')
         setEstaCargando(false)
         return
       }
-
       setPropietario(perfil)
       await cargarEmpleados(perfil.negocio_id)
     } catch (err) {
@@ -81,16 +67,13 @@ export default function PaginaEmpleados() {
     try {
       setEstaCargando(true)
       const supabase = crearCliente()
-
       const { data, error } = await supabase
         .from('usuarios')
         .select('*')
         .eq('negocio_id', negocioId)
         .eq('rol', 'empleado')
         .order('creado_en', { ascending: false })
-
       if (error) throw error
-
       setEmpleados(data || [])
     } catch (err) {
       console.error('Error al cargar empleados:', err)
@@ -106,6 +89,7 @@ export default function PaginaEmpleados() {
     setTelefono('')
     setContrasena('')
     setEmpleadoEditando(null)
+    setFotoFile(null)
     setError(null)
   }
 
@@ -119,29 +103,26 @@ export default function PaginaEmpleados() {
     setNombre(empleado.nombre_completo)
     setEmail(empleado.email)
     setTelefono(empleado.telefono || '')
-    setContrasena('') // No mostramos la contraseña
+    setContrasena('')
+    setFotoFile(null)
     setMostrarFormulario(true)
   }
 
   const manejarGuardar = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-
     if (!nombre || !email) {
       setError('Completa todos los campos requeridos')
       return
     }
-
     if (!empleadoEditando && !contrasena) {
       setError('La contraseña es requerida para nuevos empleados')
       return
     }
-
     if (contrasena && contrasena.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres')
       return
     }
-
     if (!propietario) {
       setError('Error: propietario no identificado')
       return
@@ -149,6 +130,17 @@ export default function PaginaEmpleados() {
 
     try {
       const supabase = crearCliente()
+      let fotoUrl: string | null = null
+
+      if (fotoFile) {
+        const { data, error: uploadError } = await supabase.storage
+          .from('empleados')
+          .upload(`fotos/${Date.now()}-${fotoFile.name}`, fotoFile)
+        if (uploadError) throw uploadError
+        fotoUrl = supabase.storage
+          .from('empleados')
+          .getPublicUrl(data.path).data.publicUrl
+      }
 
       if (empleadoEditando) {
         // Actualizar empleado existente
@@ -158,9 +150,9 @@ export default function PaginaEmpleados() {
             nombre_completo: nombre,
             email,
             telefono: telefono || null,
+            ...(fotoUrl && { foto_url: fotoUrl })
           })
           .eq('id', empleadoEditando.id)
-
         if (error) throw error
       } else {
         // Crear nuevo empleado vía API
@@ -173,18 +165,16 @@ export default function PaginaEmpleados() {
             contrasena,
             telefono: telefono || null,
             negocio_id: propietario.negocio_id,
+            foto_url: fotoUrl,
           }),
         })
-
         const data = await response.json()
-
         if (!response.ok) {
           setError(data.error || 'Error al crear empleado')
           return
         }
       }
 
-      // Recargar empleados
       await cargarEmpleados(propietario.negocio_id)
       setMostrarFormulario(false)
       limpiarFormulario()
@@ -194,29 +184,21 @@ export default function PaginaEmpleados() {
     }
   }
 
-
   const manejarEliminar = async (id: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar este empleado?')) {
       return
     }
-
     try {
       const supabase = crearCliente()
-
-      // Eliminar perfil de usuarios primero
       const { error: errorPerfil } = await supabase
         .from('usuarios')
         .delete()
         .eq('id', id)
-
       if (errorPerfil) throw errorPerfil
-
-      // Eliminar usuario de Auth
       const { error: errorAuth } = await supabase.auth.admin.deleteUser(id)
       if (errorAuth) {
         console.warn('Perfil eliminado pero no se pudo eliminar de Auth:', errorAuth)
       }
-
       setEmpleados(empleados.filter(e => e.id !== id))
     } catch (err) {
       console.error('Error al eliminar:', err)
@@ -243,7 +225,6 @@ export default function PaginaEmpleados() {
         </div>
         <Button onClick={manejarCrear}>+ Nuevo Empleado</Button>
       </div>
-
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
           {error}
@@ -270,7 +251,6 @@ export default function PaginaEmpleados() {
                   required
                 />
               </div>
-
               <div>
                 <Label htmlFor="email">Email *</Label>
                 <Input
@@ -282,7 +262,6 @@ export default function PaginaEmpleados() {
                   required
                 />
               </div>
-
               <div>
                 <Label htmlFor="telefono">Teléfono (opcional)</Label>
                 <Input
@@ -292,7 +271,17 @@ export default function PaginaEmpleados() {
                   placeholder="3001234567"
                 />
               </div>
-
+              <div>
+                <Label htmlFor="foto">Foto del empleado</Label>
+                <Input
+                  id="foto"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) setFotoFile(e.target.files[0])
+                  }}
+                />
+              </div>
               <div>
                 <Label htmlFor="contrasena">
                   Contraseña {empleadoEditando ? '(dejar en blanco para no cambiar)' : '*'}
@@ -306,7 +295,6 @@ export default function PaginaEmpleados() {
                   required={!empleadoEditando}
                 />
               </div>
-
               <div className="flex gap-2">
                 <Button type="submit">
                   {empleadoEditando ? 'Actualizar' : 'Crear'} Empleado
@@ -338,6 +326,9 @@ export default function PaginaEmpleados() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Foto
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Nombre
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -357,6 +348,17 @@ export default function PaginaEmpleados() {
             <tbody className="divide-y divide-gray-200">
               {empleados.map((empleado) => (
                 <tr key={empleado.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm">
+                    {empleado.foto_url ? (
+                      <img
+                        src={empleado.foto_url}
+                        alt="Foto empleado"
+                        className="h-12 w-12 object-cover rounded-full"
+                      />
+                    ) : (
+                      <span className="text-gray-400">Sin foto</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">
                     {empleado.nombre_completo}
                   </td>

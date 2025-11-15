@@ -1,12 +1,6 @@
-// src/app/reservas/page.tsx
-
-/**
- * Página pública para que clientes hagan reservas de citas
- * Ruta: /reservas
- */
-
 'use client'
 
+import emailjs from 'emailjs-com'
 import { useEffect, useState } from 'react'
 import { crearCliente } from '@/lib/supabase/client'
 import { formatearMoneda } from '@/lib/utils'
@@ -19,6 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 type Negocio = Database['public']['Tables']['negocios']['Row']
 type Servicio = Database['public']['Tables']['servicios']['Row']
 type Usuario = Database['public']['Tables']['usuarios']['Row']
+
+const EMAILJS_SERVICE_ID = 'service_uhg2aud'
+const EMAILJS_TEMPLATE_ID = 'template_0zkkmpr'
+const EMAILJS_USER_ID='ApjZSbMqKfZl4n29x'
+
 
 export default function PaginaReservas() {
   const [negocios, setNegocios] = useState<Negocio[]>([])
@@ -56,7 +55,6 @@ export default function PaginaReservas() {
     try {
       setEstaCargando(true)
       const supabase = crearCliente()
-
       // Cargar todos los negocios
       const { data: negociosData, error: errorNegocios } = await supabase
         .from('negocios')
@@ -68,12 +66,9 @@ export default function PaginaReservas() {
         setEstaCargando(false)
         return
       }
-
       setNegocios(negociosData)
-
       // Seleccionar el primero por defecto
       await cargarServiciosEmpleados(negociosData[0])
-
       setEstaCargando(false)
     } catch (err) {
       console.error('Error al cargar datos:', err)
@@ -123,14 +118,10 @@ export default function PaginaReservas() {
     try {
       setError(null)
       const supabase = crearCliente()
-
       // Obtener el día de la semana (1=Lunes, 7=Domingo)
       const fechaObj = new Date(fecha + 'T00:00:00')
       let diaSemana = fechaObj.getDay()
-      // Convertir: Sunday=0 → 7, Monday=1 → 1, etc.
       diaSemana = diaSemana === 0 ? 7 : diaSemana
-
-      console.log('Buscando horario para día:', diaSemana, 'Fecha:', fecha)
 
       // Obtener horario del empleado para ese día
       const { data: horario, error: errorHorario } = await supabase
@@ -140,26 +131,18 @@ export default function PaginaReservas() {
         .eq('dia_semana', diaSemana)
         .single()
 
-      console.log('Horario encontrado:', horario, 'Error:', errorHorario)
-
       if (errorHorario && errorHorario.code !== 'PGRST116') {
         throw errorHorario
       }
-
-      // Si no hay horario o es descanso, no hay horas disponibles
       if (!horario || horario.es_descanso) {
-        console.log('Empleado descansa este día o no tiene horario')
         setHorasDisponibles([])
         setError('Este empleado no trabaja ese día')
         return
       }
 
-      console.log('Horario del empleado:', horario)
-
       // Obtener citas ya reservadas ese día
       const fechaInicio = new Date(fecha + 'T00:00:00')
       const fechaFin = new Date(fecha + 'T23:59:59')
-
       const { data: citas, error: errorCitas } = await supabase
         .from('citas')
         .select('hora_inicio, hora_fin')
@@ -170,18 +153,9 @@ export default function PaginaReservas() {
 
       if (errorCitas) throw errorCitas
 
-      console.log('Citas reservadas:', citas)
-
-      // Calcular horas disponibles
       const horaInicioEmpleado = horario.hora_inicio.substring(0, 5)
       const horaFinEmpleado = horario.hora_fin.substring(0, 5)
       const duracionServicio = servicioSeleccionado?.duracion_minutos || 30
-
-      console.log('Generando horas:', {
-        horaInicio: horaInicioEmpleado,
-        horaFin: horaFinEmpleado,
-        duracion: duracionServicio,
-      })
 
       const horas = generarHorasDisponibles(
         horaInicioEmpleado,
@@ -189,11 +163,8 @@ export default function PaginaReservas() {
         duracionServicio,
         citas || []
       )
-
-      console.log('Horas disponibles:', horas)
       setHorasDisponibles(horas)
     } catch (err) {
-      console.error('Error al obtener horas:', err)
       setHorasDisponibles([])
       setError('Error al cargar horas disponibles')
     }
@@ -210,32 +181,26 @@ export default function PaginaReservas() {
     const [hF, mF] = horaFin.split(':').map(Number)
 
     let minutoActual = hI * 60 + mI
-
     while (minutoActual + duracion <= hF * 60 + mF) {
       const hora = String(Math.floor(minutoActual / 60)).padStart(2, '0')
       const minuto = String(minutoActual % 60).padStart(2, '0')
       const horaStr = `${hora}:${minuto}`
 
-      // Verificar si esta hora ya está reservada
       const estaReservada = citasReservadas.some((cita) => {
         const horaInicioCita = cita.hora_inicio.substring(11, 16)
         return horaInicioCita === horaStr
       })
-
       if (!estaReservada) {
         horas.push(horaStr)
       }
-
       minutoActual += duracion
     }
-
     return horas
   }
 
   const handleSeleccionarFecha = async (fecha: string) => {
     setFechaSeleccionada(fecha)
     setHoraSeleccionada('')
-
     if (empleadoSeleccionado) {
       await obtenerHorasDisponibles(fecha, empleadoSeleccionado.id)
     }
@@ -253,16 +218,13 @@ export default function PaginaReservas() {
       setError('Por favor completa todos los campos')
       return
     }
-
     if (!fechaSeleccionada || !horaSeleccionada || !empleadoSeleccionado || !servicioSeleccionado || !negocio) {
       setError('Por favor completa la selección de fecha y hora')
       return
     }
-
     try {
       setEnviando(true)
       const supabase = crearCliente()
-
       // Crear cliente si no existe
       const { data: clienteExistente } = await supabase
         .from('clientes')
@@ -270,9 +232,7 @@ export default function PaginaReservas() {
         .eq('email', emailCliente)
         .eq('negocio_id', negocio.id)
         .single()
-
       let clienteId = clienteExistente?.id
-
       if (!clienteId) {
         const { data: nuevoCliente, error: errorCliente } = await supabase
           .from('clientes')
@@ -284,19 +244,15 @@ export default function PaginaReservas() {
           })
           .select()
           .single()
-
         if (errorCliente) throw errorCliente
         clienteId = nuevoCliente.id
       }
-
       // Crear cita
       const [hora, minuto] = horaSeleccionada.split(':').map(Number)
       const fechaHora = new Date(fechaSeleccionada)
       fechaHora.setHours(hora, minuto, 0, 0)
-
       const horaFin = new Date(fechaHora)
       horaFin.setMinutes(horaFin.getMinutes() + (servicioSeleccionado?.duracion_minutos || 30))
-
       const { data: cita, error: errorCita } = await supabase
         .from('citas')
         .insert({
@@ -310,11 +266,9 @@ export default function PaginaReservas() {
         })
         .select()
         .single()
-
       if (errorCita) throw errorCita
 
       setCitaConfirmada(true)
-      // Limpiar formulario
       setTimeout(() => {
         setNombreCliente('')
         setEmailCliente('')
@@ -326,12 +280,29 @@ export default function PaginaReservas() {
         setCitaConfirmada(false)
       }, 3000)
     } catch (err) {
-      console.error('Error al confirmar:', err)
       setError('Error al confirmar la reserva')
     } finally {
       setEnviando(false)
     }
+    await emailjs.send(
+  EMAILJS_SERVICE_ID,
+  EMAILJS_TEMPLATE_ID,
+  {
+    to_email: emailCliente, 
+    title: 'Confirmación de Cita',
+    cliente: nombreCliente,
+    servicio: servicioSeleccionado?.nombre,
+    empleado: empleadoSeleccionado?.nombre_completo,
+    fecha: new Date(fechaSeleccionada).toLocaleDateString('es-ES'),
+    hora: horaSeleccionada,
+    
+  },
+  EMAILJS_USER_ID
+)
+
+      
   }
+
 
   if (estaCargando) {
     return (
@@ -416,16 +387,29 @@ export default function PaginaReservas() {
                       setFechaSeleccionada('')
                       setHoraSeleccionada('')
                     }}
-                    className={`p-3 rounded border-2 text-left transition ${
+                    className={`p-3 rounded border-2 text-left transition flex gap-3 ${
                       servicioSeleccionado?.id === servicio.id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <p className="font-medium text-gray-900">{servicio.nombre}</p>
-                    <p className="text-sm text-gray-600">
-                      {formatearMoneda(servicio.precio)} • {servicio.duracion_minutos}min
-                    </p>
+                    {servicio.imagen_url ? (
+                      <img
+                        src={servicio.imagen_url}
+                        alt={servicio.nombre}
+                        className="h-12 w-12 object-cover rounded"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded bg-gray-200 flex items-center justify-center text-gray-400 text-xl">
+                        <span>🖼️</span>
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-gray-900">{servicio.nombre}</p>
+                      <p className="text-sm text-gray-600">
+                        {formatearMoneda(servicio.precio)} • {servicio.duracion_minutos}min
+                      </p>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -443,15 +427,24 @@ export default function PaginaReservas() {
                       <button
                         key={empleado.id}
                         onClick={() => handleSeleccionarEmpleado(empleado)}
-                        className={`w-full p-3 rounded border-2 text-left transition ${
+                        className={`w-full p-3 rounded border-2 text-left transition flex items-center gap-3 ${
                           empleadoSeleccionado?.id === empleado.id
                             ? 'border-blue-500 bg-blue-50'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <p className="font-medium text-gray-900">
-                          {empleado.nombre_completo}
-                        </p>
+                        {empleado.foto_url ? (
+                          <img
+                            src={empleado.foto_url}
+                            alt={empleado.nombre_completo}
+                            className="h-12 w-12 object-cover rounded-full"
+                          />
+                        ) : (
+                          <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-xl">
+                            <span>👤</span>
+                          </div>
+                        )}
+                        <span className="font-medium text-gray-900">{empleado.nombre_completo}</span>
                       </button>
                     ))}
                   </div>
@@ -528,7 +521,6 @@ export default function PaginaReservas() {
                         placeholder="Juan Pérez"
                       />
                     </div>
-
                     <div>
                       <Label htmlFor="email" className="text-sm">
                         Email *
@@ -541,7 +533,6 @@ export default function PaginaReservas() {
                         placeholder="juan@example.com"
                       />
                     </div>
-
                     <div>
                       <Label htmlFor="telefono" className="text-sm">
                         Teléfono *
@@ -560,34 +551,41 @@ export default function PaginaReservas() {
                 <div className="border-t pt-6 space-y-4">
                   <div className="bg-gray-50 p-4 rounded">
                     <h3 className="font-semibold text-gray-900 mb-2">Resumen</h3>
-                    <div className="space-y-1 text-sm">
-                      <p>
-                        <span className="text-gray-600">Servicio:</span>{' '}
-                        <span className="font-medium">{servicioSeleccionado?.nombre}</span>
-                      </p>
-                      <p>
-                        <span className="text-gray-600">Empleado:</span>{' '}
-                        <span className="font-medium">{empleadoSeleccionado?.nombre_completo}</span>
-                      </p>
-                      <p>
-                        <span className="text-gray-600">Fecha:</span>{' '}
-                        <span className="font-medium">
-                          {new Date(fechaSeleccionada).toLocaleDateString('es-ES')}
-                        </span>
-                      </p>
-                      <p>
-                        <span className="text-gray-600">Hora:</span>{' '}
-                        <span className="font-medium">{horaSeleccionada}</span>
-                      </p>
-                      <p className="border-t pt-2 mt-2">
-                        <span className="text-gray-600">Precio:</span>{' '}
-                        <span className="font-semibold text-blue-600">
-                          {formatearMoneda(servicioSeleccionado?.precio || 0)}
-                        </span>
-                      </p>
+                    <div className="flex gap-3 items-center my-2">
+                      {servicioSeleccionado?.imagen_url && (
+                        <img src={servicioSeleccionado.imagen_url} alt="" className="h-12 w-12 object-cover rounded" />
+                      )}
+                      <div>
+                        <p>
+                          <span className="text-gray-600">Servicio:</span>{' '}
+                          <span className="font-medium">{servicioSeleccionado?.nombre}</span>
+                        </p>
+                        <p>
+                          <span className="text-gray-600">Empleado:</span>{' '}
+                          <span className="font-medium">{empleadoSeleccionado?.nombre_completo}</span>
+                          {empleadoSeleccionado?.foto_url && (
+                            <img src={empleadoSeleccionado.foto_url} alt="" className="h-8 w-8 object-cover rounded-full inline ml-2" />
+                          )}
+                        </p>
+                        <p>
+                          <span className="text-gray-600">Fecha:</span>{' '}
+                          <span className="font-medium">
+                            {new Date(fechaSeleccionada).toLocaleDateString('es-ES')}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-gray-600">Hora:</span>{' '}
+                          <span className="font-medium">{horaSeleccionada}</span>
+                        </p>
+                        <p className="border-t pt-2 mt-2">
+                          <span className="text-gray-600">Precio:</span>{' '}
+                          <span className="font-semibold text-blue-600">
+                            {formatearMoneda(servicioSeleccionado?.precio || 0)}
+                          </span>
+                        </p>
+                      </div>
                     </div>
                   </div>
-
                   <Button
                     onClick={confirmarReserva}
                     disabled={enviando}

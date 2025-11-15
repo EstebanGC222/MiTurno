@@ -7,6 +7,7 @@
 
 'use client'
 
+import emailjs from 'emailjs-com'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { crearCliente } from '@/lib/supabase/client'
@@ -20,6 +21,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 type Cita = Database['public']['Tables']['citas']['Row']
 type Usuario = Database['public']['Tables']['usuarios']['Row']
 type Servicio = Database['public']['Tables']['servicios']['Row']
+
+const EMAILJS_SERVICE_ID = 'service_uhg2aud'
+const EMAILJS_TEMPLATE_CANCELADA_ID = 'template_quyexo9' 
+const EMAILJS_USER_ID = 'ApjZSbMqKfZl4n29x'
+
 
 export default function PaginaCitas() {
   const router = useRouter()
@@ -110,25 +116,43 @@ export default function PaginaCitas() {
   }
 
   const cambiarEstadoCita = async (citaId: string, nuevoEstado: string) => {
-    try {
-      const supabase = crearCliente()
+  try {
+    const supabase = crearCliente()
+    const { error } = await supabase
+      .from('citas')
+      .update({ estado: nuevoEstado })
+      .eq('id', citaId)
 
-      const { error } = await supabase
-        .from('citas')
-        .update({ estado: nuevoEstado })
-        .eq('id', citaId)
+    if (error) throw error
 
-      if (error) throw error
-
-      // Actualizar en pantalla
-      setCitas(citas.map(c => 
-        c.id === citaId ? { ...c, estado: nuevoEstado } : c
-      ))
-    } catch (err) {
-      console.error('Error al cambiar estado:', err)
-      setError('Error al cambiar estado de la cita')
+    // Encuentra la cita recién cancelada para enviar el email
+    const cita = citas.find(c => c.id === citaId)
+    if (nuevoEstado === 'cancelada' && cita) {
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_CANCELADA_ID,
+        {
+          to_email: cita.cliente?.email,
+          cliente: cita.cliente?.nombre_completo,
+          servicio: cita.servicio?.nombre,
+          empleado: cita.empleado?.nombre_completo,
+          fecha: new Date(cita.hora_inicio).toLocaleDateString('es-ES'),
+          hora: new Date(cita.hora_inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        },
+        EMAILJS_USER_ID
+      )
     }
+
+    // Actualizar UI
+    setCitas(citas.map(c => 
+      c.id === citaId ? { ...c, estado: nuevoEstado } : c
+    ))
+  } catch (err) {
+    console.error('Error al cambiar estado:', err)
+    setError('Error al cambiar estado de la cita')
   }
+}
+
 
   const eliminarCita = async (citaId: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar esta cita?')) {
@@ -265,7 +289,7 @@ export default function PaginaCitas() {
           </Button>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {['todos', 'confirmada', 'cancelada', 'completada'].map((estado) => (
+          {['todos', 'confirmada', 'cancelada'].map((estado) => (
             <Button
               key={estado}
               onClick={() => setFiltroEstado(estado)}
@@ -333,7 +357,6 @@ function TarjetaCita({
   const colorEstado: any = {
     confirmada: 'bg-blue-100 text-blue-800 border-blue-300',
     cancelada: 'bg-red-100 text-red-800 border-red-300',
-    completada: 'bg-green-100 text-green-800 border-green-300',
   }
 
   return (
@@ -367,18 +390,10 @@ function TarjetaCita({
 
       {/* Acciones */}
       <div className="flex gap-2 pt-3 border-t border-gray-200">
-        {cita.estado !== 'completada' && cita.estado !== 'cancelada' && (
+        {cita.estado !== 'cancelada' && (
           <>
             {cita.estado === 'confirmada' && (
               <>
-                <Button
-                  onClick={() => onCambiarEstado(cita.id, 'completada')}
-                  variant="outline"
-                  size="sm"
-                  className="text-green-600 hover:text-green-700"
-                >
-                  Completar
-                </Button>
                 <Button
                   onClick={() => onCambiarEstado(cita.id, 'cancelada')}
                   variant="outline"
