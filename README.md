@@ -1,80 +1,176 @@
-# MiTurno Software
+# MiTurno – Sistema de reservas para negocios de servicios
 
+## Descripción
 
-## 📖 Descripción del Proyecto
-
-**MiTurno** es una solución de software como servicio (SaaS) de gestión organizacional y comercial, diseñada específicamente para las PYMES del sector de la belleza y el cuidado personal en Colombia (barberías, peluquerías, centros de estética, etc.).
-
-El proyecto nace para abordar una brecha crítica en el ecosistema empresarial colombiano: a pesar de que la transformación digital es un pilar para la supervivencia y el crecimiento, las PYMES del sector estético enfrentan una baja madurez digital (solo un 37,1% en promedio). Muchas de ellas gestionan sus procesos de forma manual o con herramientas genéricas, lo que limita su competitividad, aumenta la carga operativa y dificulta la toma de decisiones estratégicas.
-
-MiTurno busca democratizar el acceso a la tecnología, ofreciendo una herramienta **intuitiva, accesible y adaptable** que permite optimizar procesos clave como la **gestión de citas, la administración de clientes y el control de inventarios**, fortaleciendo así su capacidad de crecimiento en el mercado actual.
+MiTurno es una aplicación web que permite a negocios de servicios (peluquerías, barberías, salones de belleza, etc.) gestionar de forma centralizada sus citas, servicios, empleados y clientes.  
+El sistema ofrece una vista pública para que los clientes reserven en línea y un panel administrativo para que el negocio controle su agenda, realice cancelaciones, gestione horarios y envíe notificaciones automáticas por correo electrónico.
 
 ---
 
-## 🎯 Misión y Visión
+## Arquitectura general
 
-### Misión
-Nuestra misión es democratizar el acceso a la tecnología para las pequeñas y medianas empresas (PYMES) del sector de la belleza y el cuidado personal en Colombia. A través de una plataforma de gestión intuitiva, asequible y adaptada a sus necesidades reales, simplificamos sus operaciones diarias, les permitimos profesionalizar su servicio y potenciamos su crecimiento sostenible en la economía digital.
-
-### Visión
-Ser la plataforma de software líder y el aliado estratégico preferido para la gestión y crecimiento de los negocios de belleza y bienestar en Colombia para el año 2030, reconocidos por nuestra innovación práctica, nuestra facilidad de uso y un profundo compromiso con el éxito y la formalización de nuestros clientes.
+La aplicación está construida como una SPA (Single Page Application) sobre **Next.js** usando el **App Router**, lo que permite combinar páginas de cliente y de servidor, además de exponer rutas API dentro del mismo proyecto.  
+El frontend (interfaz de usuario) se implementa con **React** y **Tailwind CSS**, mientras que el backend ligero se resuelve con las API Routes de Next.js y **Supabase** como BaaS (Base de datos Postgres, autenticación y storage).   
 
 ---
 
-## ✨ Características Principales
+## Stack tecnológico
 
-La plataforma está diseñada para aliviar las frustraciones más comunes de los dueños de negocios y ofrecerles alegrías a través de la eficiencia y la organización.
+### Framework y lenguaje
 
-*   **Módulo de Agenda y Reservas:** Un calendario intuitivo y centralizado para agendar, modificar y cancelar citas fácilmente, reduciendo errores y ahorrando tiempo.
-*   **Gestión de Clientes (CRM Básico):** Una base de datos para almacenar el historial de visitas y las preferencias de los clientes, permitiendo un servicio más profesional y personalizado.
-*   **Reportes y Estadísticas:** Un panel administrativo con indicadores clave de negocio (ingresos, citas, etc.) para facilitar la toma de decisiones basadas en datos.
-*   **Acceso Multiplataforma:** Diseño web responsivo que permite acceder a la plataforma desde cualquier dispositivo (PC, tablet o smartphone).
-*   **Modelo de Suscripción Flexible:** Planes de pago mensual accesibles, diseñados para la realidad financiera de las PYMES del sector, con la opción de una prueba gratuita para experimentar el valor del software sin compromiso.
-*   **Adaptación al Contexto Local:** Funcionalidades pensadas para el mercado colombiano, superando las limitaciones de plataformas internacionales.
+- **Next.js (App Router)**  
+  - Ruteo de páginas públicas y privadas.  
+  - Renderizado híbrido (SSR/CSR) y API Routes para lógica de negocio básica.  
 
----
+- **React**  
+  - Componentes funcionales para la UI.  
+  - Hooks como `useState` y `useEffect` para manejar estado y efectos (carga de datos, cambios en la interfaz).
 
-## 👥 Público Objetivo
+- **TypeScript**  
+  - Tipado estático para el modelo de datos de Supabase (`database.ts`) y el resto del código.  
+  - Reduce errores de tiempo de ejecución y mejora el autocompletado en el IDE.
 
-Nuestra solución está dirigida a **micro y pequeños empresarios del sector de la belleza en Colombia**, principalmente en ciudades como Bogotá, Medellín, Cali y Pereira. Este segmento se caracteriza por:
+### Estilos y UI
 
-*   Operar con recursos limitados.
-*   Gestionar sus procesos de manera manual (agendas de papel, WhatsApp) o con herramientas poco eficientes.
-*   Requerir soluciones de bajo costo, alta usabilidad y con un soporte técnico cercano y en español.
-*   Buscar profesionalizar su negocio y mejorar su eficiencia operativa.
+- **Tailwind CSS**  
+  - Estilos utilitarios para construir una interfaz moderna y responsiva.  
+  - Permite prototipar rápido sin mantener grandes hojas de estilo personalizadas.
 
----
+- **Componentes UI (Card, Button, Input, etc.)**  
+  - Componentes reutilizables para formularios, tarjetas de cita, listados y paneles administrativos.
 
-## 💻 Stack Tecnológico (Propuesta)
+### Backend as a Service
 
-*   **Arquitectura:** Basada en la nube (Cloud) bajo un modelo Software como Servicio (SaaS).
-*   **Frontend:** Desarrollo web responsivo utilizando tecnologías modernas como HTML5, CSS y frameworks de JavaScript (ej. React, Vue.js).
-*   **Backend:** Lógica de negocio robusta con tecnologías como Node.js, Express, etc.
-*   **Base de Datos:** Sistemas de bases de datos seguros para el almacenamiento de la información.
-*   **Integraciones:** Preparado con APIs para futuras integraciones con otras plataformas, como pasarelas de pago locales (Nequi, Daviplata).
+- **Supabase (Postgres + Auth + Storage)**  
+  - Base de datos relacional con tablas principales: `negocios`, `servicios`, `usuarios`, `clientes`, `citas`, `horarios_empleados`.  
+  - Autenticación y gestión de usuarios (roles `admin` y `empleado`) y relación con la tabla `usuarios`.  
+  - Storage para posibles recursos como imágenes de servicios o fotos de empleados.  
 
----
+- **Clientes Supabase**  
+  - Cliente de navegador (`createBrowserClient`) para consultar y modificar datos desde componentes cliente.  
+  - Cliente de servidor (`createServerClient`) para rutas API y componentes de servidor con manejo de cookies/sesión.
 
-## 🚀 Objetivos Estratégicos (SMART)
+### Notificaciones por correo
 
-### Objetivos Financieros
-*   Alcanzar el punto de equilibrio financiero en un plazo de 24 meses.
-*   Lograr un crecimiento de ingresos anual recurrente (ARR) del 50% a partir del segundo año.
-
-### Objetivos de Mercado y Clientes
-*   Adquirir una base de 150 clientes activos de pago durante los primeros 18 meses de operación.
-*   Lograr un índice de satisfacción del cliente (CSAT) superior al 90%.
-*   Establecer al menos dos alianzas estratégicas con asociaciones del sector en el primer año.
-
-### Objetivos de Producto
-*   Lanzar el Producto Mínimo Viable (MVP) en los primeros 6 meses del proyecto.
-*   Mantener un tiempo de actividad (uptime) de la plataforma superior al 99.5%.
+- **EmailJS**  
+  - Integración desde el frontend para enviar correos transaccionales usando plantillas.  
+  - Plantillas específicas para:
+    - Confirmación de cita (fecha, hora, servicio, empleado, datos del cliente).  
+    - Cancelación de cita (informando que la cita ha sido anulada).
 
 ---
 
-## 🧑‍💻 Autores del Proyecto
+## Funcionalidades principales
 
-*   **Esteban Guevara Cardona**
+- **Gestión de negocios**
+  - Registro de datos básicos del negocio: nombre, logo, dirección, ciudad, teléfono, límites de reserva y buffer entre citas.
 
+- **Gestión de servicios**
+  - Creación y edición de servicios con nombre, descripción, precio, duración y estado (activo/inactivo).  
+  - Asociación de servicios a un negocio específico.
 
-Un proyecto de la **Universidad Tecnológica de Pereira**, para la carrera de **Tecnología en Desarrollo de Software**.
+- **Gestión de empleados**
+  - Alta de empleados desde el panel admin, creando usuario en Supabase Auth y perfil en la tabla `usuarios`.  
+  - Asignación de rol `empleado`, negocio al que pertenece, datos de contacto y foto de perfil.
+
+- **Gestión de clientes**
+  - Registro automático de clientes al momento de reservar (nombre completo, email, teléfono).  
+  - Reutilización del cliente si ya existe en el mismo negocio (evita duplicados).
+
+- **Horarios y disponibilidad**
+  - Tabla `horarios_empleados` para definir horarios laborales por día de la semana y estado de descanso.  
+  - Cálculo de horas disponibles considerando:
+    - Horario del empleado.  
+    - Duración del servicio.  
+    - Citas ya confirmadas para evitar solapamientos.
+
+- **Reservas para clientes (front público)**
+  - Flujo guiado en pasos: seleccionar servicio → seleccionar empleado → elegir fecha → elegir hora → llenar datos personales.  
+  - Validaciones de campos obligatorios y feedback visual (cargando, errores, confirmación).  
+  - Creación de la cita en la tabla `citas` con estado `confirmada`.
+
+- **Panel de administración de citas**
+  - Listado de todas las citas del negocio agrupadas por fecha.  
+  - Filtros por estado (`todas`, `confirmada`, `cancelada`).  
+  - Acciones:
+    - Cancelar cita (cambia el estado a `cancelada` y dispara correo al cliente).  
+    - Eliminar cita (borra definitivamente el registro).  
+    - Crear cita de prueba mediante endpoint específico.
+
+- **Notificaciones por correo**
+  - **Confirmación de cita:** se envía automáticamente al crear una reserva, incluyendo servicio, empleado, fecha y hora.  
+  - **Cancelación de cita:** se envía cuando el administrador cambia el estado de una cita a `cancelada` desde el panel.
+
+- **Seguridad y autenticación**
+  - Acceso al panel `/admin` restringido a usuarios con rol `admin`.  
+  - Separación entre flujo público de reservas (sin login) y flujo administrativo (requiere autenticación).
+
+---
+
+## Flujo del administrador
+
+1. **Registro / acceso del administrador**
+   - El administrador accede a la aplicación y se autentica mediante Supabase Auth.  
+   - Una vez autenticado y con rol `admin`, obtiene acceso al panel `/admin`.
+
+2. **Configuración inicial del negocio**
+   - Registra/edita los datos del negocio: nombre, dirección, ciudad, teléfono, logo, parámetros de reserva (días máximos, buffers).  
+
+3. **Creación y gestión de servicios**
+   - Desde la sección de servicios, crea nuevos servicios especificando nombre, descripción, duración y precio.  
+   - Puede activar/desactivar servicios según la oferta actual del negocio.
+
+4. **Registro de empleados**
+   - Utiliza el formulario de creación de empleados para:
+     - Crear el usuario en Supabase Auth (correo y contraseña).  
+     - Registrar el perfil en la tabla `usuarios` con rol `empleado`, teléfono y foto opcional.  
+
+5. **Configuración de horarios**
+   - Define, para cada empleado, los horarios de trabajo por día en `horarios_empleados` (hora inicio, hora fin, días de descanso).  
+
+6. **Gestión diaria de citas**
+   - Visualiza todas las citas del negocio agrupadas por fecha.  
+   - Filtra por estado (todas, confirmadas, canceladas).  
+   - Puede:
+     - **Cancelar** una cita (estado pasa a `cancelada` y se envía email de cancelación al cliente).  
+     - **Eliminar** una cita si ya no debe figurar en el sistema.  
+     - **Crear citas de prueba** para validar el flujo o hacer demostraciones.  
+
+7. **Seguimiento y control**
+   - Supervisa la ocupación de la agenda de empleados y la distribución de servicios.  
+   - Ajusta servicios, empleados u horarios según la carga de trabajo y necesidades del negocio.
+
+---
+
+## Flujo del empleado
+
+> Nota: el rol `empleado` se centra en prestar el servicio; en esta versión inicial, el acceso principal está pensado para que el administrador gestione las citas, pero el modelo de datos y la autenticación ya soportan un flujo específico de empleado.
+
+1. **Acceso como empleado**
+   - El empleado puede autenticarse con el usuario creado por el administrador (Supabase Auth).  
+   - En versiones futuras, puede tener un panel reducido donde solo vea sus propias citas.
+
+2. **Asignación de citas**
+   - Las citas creadas por los clientes se asocian a un `empleado_id`.  
+   - El empleado tiene visibilidad (directa o a través del admin) de su agenda diaria, con hora de inicio, fin y tipo de servicio.
+
+3. **Ejecución del servicio**
+   - El empleado atiende al cliente según la información de la cita (servicio, duración, notas del cliente si aplica).  
+
+4. **Escalabilidad futura**
+   - El modelo actual permite ampliar el rol de empleado para:
+     - Ver/gestionar solo sus citas.  
+     - Marcar estados adicionales (en progreso, finalizada).  
+     - Registrar notas o resultados por cita.
+
+---
+
+## Flujo del cliente
+
+A alto nivel, el flujo es:
+
+1. El cliente accede a la página de reservas, selecciona servicio, empleado, fecha y hora, e ingresa sus datos de contacto.  
+2. El frontend se comunica con Supabase para crear o reutilizar el registro del cliente y generar la cita en la tabla `citas`.  
+3. Se dispara una notificación por correo (confirmación o cancelación) usando EmailJS y plantillas dinámicas.  
+4. El administrador, desde el panel `/admin`, puede ver todas las citas del negocio, filtrarlas, cancelarlas o eliminarlas, así como crear citas de prueba y gestionar su agenda. 
+
